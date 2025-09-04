@@ -4,10 +4,10 @@ setlocal enabledelayedexpansion
 chcp 65001 >nul
 title Minecraft服务器控制面板
 
-set CONFIG_FILE=server.conf
+:: by_YC - 服务器启动脚本
+
+set CONFIG_FILE=start_config
 set SERVER_JAR=
-set RESTART_COUNT=0
-set MAX_RESTARTS=0
 
 :: 初始化配置
 if not exist "%CONFIG_FILE%" (
@@ -22,7 +22,6 @@ for /f "tokens=1,* delims==" %%a in (%CONFIG_FILE%) do (
 )
 
 :: 检查Java安装
-:check_java
 where java >nul 2>nul
 if errorlevel 1 (
     echo 未找到Java安装!
@@ -30,7 +29,7 @@ if errorlevel 1 (
     timeout /t 5 /nobreak >nul
     start "" "https://www.azul.com/downloads/"
     pause
-    goto check_java
+    exit /b 1
 )
 
 :: 自动检测服务器核心
@@ -102,52 +101,52 @@ cls
 echo =========================================
 echo    Minecraft服务器控制面板
 echo =========================================
-echo a) 启动服务器 (单次运行)
-echo b) 启动服务器 (带自动重启)
-echo c) 检查Java版本
-echo d) 关闭脚本
+echo a)—启动服务器
+echo b)—检查Java版本
+echo c—关闭脚本
 echo =========================================
+
+:: 检查服务器是否正在运行
+set "server_running=false"
+for /f "tokens=2 delims= " %%i in ('tasklist /fi "imagename eq java.exe" /fo table /nh ^| find /i "java.exe"') do (
+    set "server_running=true"
+)
+
+if "!server_running!"=="true" (
+    echo 当前状态: 运行中
+) else (
+    echo 当前状态: 已停止
+)
+
 echo 服务器核心: %SERVER_JAR%
 echo Java路径: %JAVA_PATH%
 echo 内存设置: %JAVA_OPTS%
 echo =========================================
 
-set /p "choice=请选择操作 [a-d]: "
+set /p "choice=请选择操作 [a-c]: "
 
-if "!choice!"=="a" goto :option_a
-if "!choice!"=="A" goto :option_a
-if "!choice!"=="b" goto :option_b
-if "!choice!"=="B" goto :option_b
-if "!choice!"=="c" goto :option_c
-if "!choice!"=="C" goto :option_c
-if "!choice!"=="d" goto :option_d
-if "!choice!"=="D" goto :option_d
+if /i "!choice!"=="a" goto :option_a
+if /i "!choice!"=="b" goto :option_b
+if /i "!choice!"=="c" goto :option_c
 
 echo 无效选择，请重新输入
 timeout /t 2 /nobreak >nul
 goto :main_menu
 
 :option_a
-echo 启动服务器 (单次运行)...
-set MAX_RESTARTS=0
+echo 启动服务器...
 call :start_server
-pause
 goto :main_menu
 
 :option_b
-set /p "MAX_RESTARTS=请输入最大重启次数: "
-echo 启动服务器 (最多重启 !MAX_RESTARTS! 次)...
-set RESTART_COUNT=0
-call :start_server
+echo 正在检查Java版本...
+%JAVA_PATH% -version 2>&1
+echo.
+echo Java路径: %JAVA_PATH%
 pause
 goto :main_menu
 
 :option_c
-call :check_java_version
-pause
-goto :main_menu
-
-:option_d
 echo 关闭脚本...
 exit /b 0
 
@@ -160,63 +159,57 @@ if not exist "%SERVER_JAR%" (
 )
 
 :: 检查服务器是否已经在运行
-set "server_running=false"
-for /f "tokens=2 delims= " %%i in ('tasklist /fi "imagename eq java.exe" /fo table /nh ^| find /i "java.exe"') do (
-    set "server_running=true"
-)
-
-if "!server_running!"=="true" (
+tasklist /fi "imagename eq java.exe" | find /i "java.exe" >nul
+if not errorlevel 1 (
     echo 服务器已经在运行中!
     pause
     exit /b 1
 )
 
+:: 检测EULA文件
+echo 正在检测EULA文件...
+:eula_check
+if not exist "eula.txt" (
+    echo 未找到eula.txt文件，3秒后重新检测...
+    timeout /t 3 /nobreak >nul
+    goto :eula_check
+)
+
+:: 检查eula.txt内容
+set "eula_accepted=false"
+set "line_number=0"
+for /f "usebackq delims=" %%i in ("eula.txt") do (
+    set /a "line_number+=1"
+    if !line_number! equ 3 (
+        if "%%i"=="eula=false" (
+            set "eula_accepted=false"
+        ) else if "%%i"=="eula=true" (
+            set "eula_accepted=true"
+        )
+    )
+)
+
+if "!eula_accepted!"=="false" (
+    echo 检测到eula=false，正在自动同意EULA...
+    (for /f "tokens=1* delims=:" %%a in ('findstr /n "^" "eula.txt"') do (
+        if "%%a"=="3" (
+            echo eula=true
+        ) else (
+            echo(%%b
+        )
+    )) > "%temp%\eula_new.txt"
+    move /y "%temp%\eula_new.txt" "eula.txt" >nul
+    echo 已同意EULA(eula=true)
+)
+
+:: 启动服务器
 echo 正在启动Minecraft服务器...
 echo 使用核心: %SERVER_JAR%
 echo Java参数: %JAVA_OPTS%
 
-:: 启动服务器
 start "Minecraft Server" %JAVA_PATH% %JAVA_OPTS% -jar "%SERVER_JAR%" nogui
 
-echo 服务器已启动，请查看服务器窗口...
-timeout /t 3 /nobreak >nul
-
-:: 如果设置了重启次数，则进入监控循环
-if !MAX_RESTARTS! gtr 0 (
-    :monitor_loop
-    timeout /t 5 /nobreak >nul
-    
-    :: 检查服务器是否仍在运行
-    set "server_running=false"
-    for /f "tokens=2 delims= " %%i in ('tasklist /fi "imagename eq java.exe" /fo table /nh ^| find /i "java.exe"') do (
-        set "server_running=true"
-    )
-    
-    if "!server_running!"=="false" (
-        echo 服务器已停止运行
-        set /a RESTART_COUNT+=1
-        
-        if !RESTART_COUNT! leq !MAX_RESTARTS! (
-            echo 正在重启服务器 (!RESTART_COUNT!/!MAX_RESTARTS!)...
-            title Minecraft服务器 - 重启中 (!RESTART_COUNT!/!MAX_RESTARTS!)
-            start "Minecraft Server" %JAVA_PATH% %JAVA_OPTS% -jar "%SERVER_JAR%" nogui
-            goto :monitor_loop
-        ) else (
-            echo 已达到最大重启次数 (!MAX_RESTARTS!)
-            title Minecraft服务器 - 已停止 (达到最大重启次数)
-        )
-    ) else (
-        title Minecraft服务器 - 运行中 (!RESTART_COUNT!/!MAX_RESTARTS! 次重启)
-        goto :monitor_loop
-    )
-)
-
-:: 恢复默认标题
-title Minecraft服务器控制面板
-goto :eof
-
-:check_java_version
-echo 正在检查Java版本...
-%JAVA_PATH% -version 2>&1 | findstr /i "version"
-echo Java路径: %JAVA_PATH%
+echo 服务器已启动!
+echo 注意: 您需要在服务器控制台中输入 'stop' 来正常关闭服务器
+pause
 goto :eof
