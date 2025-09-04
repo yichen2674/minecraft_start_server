@@ -41,11 +41,11 @@ for %%i in (*server*.jar) do (
         set "SERVER_JAR=%%i"
         set "CORE_FOUND=true"
         echo 找到服务器核心: !SERVER_JAR!
-        goto :core_found
+        goto :main_menu
     )
 )
 
-:core_found
+:: 如果没有找到核心，显示选择菜单
 if "!CORE_FOUND!"=="false" (
     echo 未找到服务器核心文件(包含server字段的jar文件)
     echo.
@@ -80,6 +80,7 @@ if "!CORE_FOUND!"=="false" (
         if exist "!custom_core!" (
             set "SERVER_JAR=!custom_core!"
             echo SERVER_JAR=!SERVER_JAR!>> "%CONFIG_FILE%"
+            goto :main_menu
         ) else (
             echo 文件不存在: !custom_core!
             pause
@@ -89,15 +90,14 @@ if "!CORE_FOUND!"=="false" (
     if "!choice!"=="5" (
         exit /b 0
     )
-) else (
-    :: 更新配置文件中的服务器核心路径
-    if not "!SERVER_JAR!"=="!SERVER_JAR_OLD!" (
-        echo SERVER_JAR=!SERVER_JAR!>> "%CONFIG_FILE%"
-    )
 )
 
 :main_menu
-call :update_title "菜单"
+:: 更新配置文件中的服务器核心路径
+if not "%SERVER_JAR%"=="" (
+    echo SERVER_JAR=%SERVER_JAR%>> "%CONFIG_FILE%"
+)
+
 cls
 echo =========================================
 echo    Minecraft服务器控制面板
@@ -107,18 +107,6 @@ echo b) 启动服务器 (带自动重启)
 echo c) 检查Java版本
 echo d) 关闭脚本
 echo =========================================
-
-:: 检查服务器是否正在运行
-set "server_running=false"
-for /f "tokens=2 delims= " %%i in ('tasklist /fi "imagename eq java.exe" /fo table /nh ^| find /i "java.exe"') do (
-    set "server_running=true"
-)
-
-if "!server_running!"=="true" (
-    echo 当前状态: 运行中
-) else (
-    echo 当前状态: 已停止
-)
 echo 服务器核心: %SERVER_JAR%
 echo Java路径: %JAVA_PATH%
 echo 内存设置: %JAVA_OPTS%
@@ -190,9 +178,6 @@ echo Java参数: %JAVA_OPTS%
 :: 启动服务器
 start "Minecraft Server" %JAVA_PATH% %JAVA_OPTS% -jar "%SERVER_JAR%" nogui
 
-:: 更新窗口标题
-call :update_title "运行中" !RESTART_COUNT! "已启动"
-
 echo 服务器已启动，请查看服务器窗口...
 timeout /t 3 /nobreak >nul
 
@@ -213,41 +198,25 @@ if !MAX_RESTARTS! gtr 0 (
         
         if !RESTART_COUNT! leq !MAX_RESTARTS! (
             echo 正在重启服务器 (!RESTART_COUNT!/!MAX_RESTARTS!)...
-            call :update_title "重启中" !RESTART_COUNT!
+            title Minecraft服务器 - 重启中 (!RESTART_COUNT!/!MAX_RESTARTS!)
             start "Minecraft Server" %JAVA_PATH% %JAVA_OPTS% -jar "%SERVER_JAR%" nogui
             goto :monitor_loop
         ) else (
             echo 已达到最大重启次数 (!MAX_RESTARTS!)
-            call :update_title "已停止" !RESTART_COUNT! "达到最大重启次数"
+            title Minecraft服务器 - 已停止 (达到最大重启次数)
         )
     ) else (
-        :: 获取内存使用信息
-        for /f "skip=3 tokens=5" %%i in ('tasklist /fi "imagename eq java.exe" /fo table') do (
-            set mem_usage=%%i
-            call :update_title "运行中" !RESTART_COUNT! "内存: !mem_usage!"
-            goto :monitor_loop
-        )
+        title Minecraft服务器 - 运行中 (!RESTART_COUNT!/!MAX_RESTARTS! 次重启)
+        goto :monitor_loop
     )
 )
 
+:: 恢复默认标题
+title Minecraft服务器控制面板
 goto :eof
 
 :check_java_version
 echo 正在检查Java版本...
 %JAVA_PATH% -version 2>&1 | findstr /i "version"
 echo Java路径: %JAVA_PATH%
-goto :eof
-
-:update_title
-setlocal
-set status=%~1
-set restart_count=%~2
-set resources=%~3
-
-if "%~3"=="" (
-    title Minecraft服务器 - 状态: %~1 - 重启次数: %~2
-) else (
-    title Minecraft服务器 - 状态: %~1 - 重启次数: %~2 - %~3
-)
-endlocal
 goto :eof
