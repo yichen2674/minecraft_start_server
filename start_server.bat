@@ -49,6 +49,7 @@ if "!CORE_FOUND!"=="false" (
     echo 未找到服务器核心文件(包含server字段的jar文件)
     echo.
     echo 请选择要安装的服务器核心:
+    echo 注意:请把服务器核心文件名改成server.jar
     echo 1) Vanilla (官方原版)
     echo 2) Paper (高性能)
     echo 3) Spigot (插件支持)
@@ -166,11 +167,17 @@ if not errorlevel 1 (
     exit /b 1
 )
 
+:: 启动服务器
+echo 正在启动Minecraft服务器...
+echo 使用核心: %SERVER_JAR%
+echo Java参数: %JAVA_OPTS%
+
+start "Minecraft Server" %JAVA_PATH% %JAVA_OPTS% -jar "%SERVER_JAR%" nogui
+
 :: 检测EULA文件
 echo 正在检测EULA文件...
 :eula_check
 if not exist "eula.txt" (
-    echo 未找到eula.txt文件，3秒后重新检测...
     timeout /t 3 /nobreak >nul
     goto :eula_check
 )
