@@ -26,10 +26,13 @@ where java >nul 2>nul
 if errorlevel 1 (
     echo 未找到Java安装!
     echo 请安装Java后继续，将打开Java下载页面...
-    timeout /t 5 /nobreak >nul
+    timeout /t 3 /nobreak >nul
     start "" "https://www.azul.com/downloads/"
-    pause
-    exit /b 1
+    echo.
+    echo 按任意键重新运行脚本...
+    pause >nul
+    %0
+    exit /b
 )
 
 :: 自动检测服务器核心
@@ -60,20 +63,29 @@ if "!CORE_FOUND!"=="false" (
     
     if "!choice!"=="1" (
         echo 请从 https://www.minecraft.net/zh-hans/download/server 下载服务器jar文件并放置于此目录
-        pause
-        exit /b 1
+        echo.
+        echo 按任意键重新运行脚本...
+        pause >nul
+        %0
+        exit /b
     )
     if "!choice!"=="2" (
         start "" "https://papermc.io/downloads"
         echo 请下载Paper服务器jar文件并放置于此目录
-        pause
-        exit /b 1
+        echo.
+        echo 按任意键重新运行脚本...
+        pause >nul
+        %0
+        exit /b
     )
     if "!choice!"=="3" (
         start "" "https://www.spigotmc.org/wiki/spigot-installation/"
         echo 请下载Spigot服务器jar文件并放置于此目录
-        pause
-        exit /b 1
+        echo.
+        echo 按任意键重新运行脚本...
+        pause >nul
+        %0
+        exit /b
     )
     if "!choice!"=="4" (
         set /p "custom_core=请输入服务器核心文件名: "
@@ -83,8 +95,11 @@ if "!CORE_FOUND!"=="false" (
             goto :main_menu
         ) else (
             echo 文件不存在: !custom_core!
-            pause
-            exit /b 1
+	    echo.
+            echo 按任意键重新运行脚本...
+            pause >nul
+            %0
+            exit /b
         )
     )
     if "!choice!"=="5" (
